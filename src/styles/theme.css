@@ -1,0 +1,7 @@
+:root{ --grid-gap: 12px }
+*{ box-sizing: border-box }
+button { transition: background-color .15s ease, transform .05s ease }
+button:active{ transform: translateY(1px) }
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
