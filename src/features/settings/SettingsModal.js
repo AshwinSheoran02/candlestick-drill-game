@@ -10,7 +10,7 @@ export function SettingsModal(root){
   card.innerHTML = `
     <h2 class="text-lg font-semibold mb-3">Settings</h2>
     <label class="grid gap-2 mb-3">
-      <span class="text-sm">Gemini API key (stored in session)</span>
+      <span class="text-sm">Gemini API key (optional; stored in session)</span>
       <input id="apiKey" type="password" class="bg-slate-900 border border-slate-800 rounded px-2 py-2" placeholder="AIza..." />
       <span class="text-xs text-[var(--muted)]">Keys in the browser are public. The app works without a key using local generation.</span>
     </label>
@@ -28,14 +28,14 @@ export function SettingsModal(root){
   overlay.appendChild(card);
   root.appendChild(overlay);
 
-  const apiInput = "AIzaSyCRTc5G9hPlmuX6lBmT5J6Vylzi2-32o-8";
-  apiInput.value = sessionStorage.getItem('ta:apikey') || '';
+  const apiInput = card.querySelector('#apiKey');
+  apiInput.value = sessionStorage.getItem('ta:k1') || '';
 
   card.querySelector('#closeBtn').onclick = ()=> useUI.set({ showSettings: false });
   card.querySelector('#saveBtn').onclick = ()=>{
-    const key = apiInput.value.trim();
-    if (key) sessionStorage.setItem('ta:apikey', key);
-    else sessionStorage.removeItem('ta:apikey');
+  const key = apiInput.value.trim();
+  if (key) sessionStorage.setItem('ta:k1', key);
+  else sessionStorage.removeItem('ta:k1');
     useSettings.set({ useLocalOnFail: card.querySelector('#fallback').checked, highContrast: card.querySelector('#contrast').checked });
     useUI.set({ showSettings: false });
   };

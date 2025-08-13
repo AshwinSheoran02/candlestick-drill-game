@@ -2,11 +2,12 @@
 // Uses responseMimeType application/json to encourage strict JSON output per spec.
 
 import { buildPrompt } from './prompt.js';
+const GEMINI_API_KEY = 'AIzaSyCRTc5G9hPlmuX6lBmT5J6Vylzi2-32o-8';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export async function requestGeminiItem(params){
-  const key = sessionStorage.getItem('ta:apikey');
+  const key = GEMINI_API_KEY;
   if (!key) throw new Error('MISSING_API_KEY');
   const prompt = buildPrompt(params);
   const body = {

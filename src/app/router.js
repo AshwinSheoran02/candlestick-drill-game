@@ -7,11 +7,13 @@ import { useUI } from '../lib/state/ui.js';
 import { useSession } from '../lib/state/session.js';
 import { useSettings } from '../lib/state/settings.js';
 import { useNotify } from '../lib/state/notify.js';
+import { useTelemetry } from '../lib/state/telemetry.js';
 
 export function App(root) {
   const ui = useUI.get();
   const session = useSession.get();
   const settings = useSettings.get();
+  const telem = useTelemetry.get();
 
   const header = document.createElement('header');
   header.className = 'sticky top-0 z-10 border-b border-slate-800 bg-[var(--bg)]/80 backdrop-blur';
@@ -23,6 +25,7 @@ export function App(root) {
       </div>
       <div class="text-center font-semibold">Candlestick Drill — <span class="text-[var(--accent)]">${settings.difficulty}</span></div>
       <div class="text-right">
+        ${telem.offline? '<span class="mr-2 px-2 py-1 rounded bg-amber-600/30 text-amber-300 text-xs">Offline AI</span>':''}
         <button id="settingsBtn" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">Settings</button>
         <button id="statsBtn" class="ml-2 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">Stats</button>
       </div>

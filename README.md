@@ -31,3 +31,10 @@ No backend. Keys are stored in sessionStorage only.
 - Neutral items do not break streak; only directional misses do.
 - Works offline with local generator.# candlestick-drill-game
 candlestick drill game
+
+## Hybrid Mode (Local-first + Batched Gemini)
+
+- On start: seeds 5 local Easy items (2–3 bars) for instant drills.
+- In parallel: fires a single Gemini batch (20 items) using current UI settings; all items are validated and deduped.
+- Next item logic: prefer Gemini queue; fallback to Local queue; if both empty, synthesize one on the fly (non-blocking).
+- Only one batch per session; changing difficulty/candles triggers a new session and batch.

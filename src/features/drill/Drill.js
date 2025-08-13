@@ -3,7 +3,7 @@ import { AnswerButtons } from '../../components/AnswerButtons.js';
 import { strings } from '../../lib/util/strings.js';
 import { useQueue } from '../../lib/state/queue.js';
 import { useCurrent } from '../../lib/state/current.js';
-import { fetchItem, fetchNextItemEnsured } from '../../lib/ai/pipeline.js';
+import { fetchItem, fetchNextItemEnsured, startHybridSession, getNextHybridItem } from '../../lib/ai/pipeline.js';
 import { useSession } from '../../lib/state/session.js';
 import { markAnswered, markQuestionShown } from '../../lib/state/telemetry.js';
 
@@ -68,29 +68,14 @@ export function Drill(root){
     resultHost.appendChild(status);
     const nextBtn = status.querySelector('#nextBtn');
     nextBtn.onclick = async ()=>{
-      // move to next item
-      const q = useQueue.get();
-      let nextItem = null;
-      if (q.items.length > 0){
-        nextItem = q.items[0];
-        useQueue.set({ items: q.items.slice(1) });
-      }
-      if (nextItem){
-        useCurrent.set({ item: nextItem, choice: null });
-        // prefetch following
-        fetchNextItemEnsured();
-      } else {
-        // no queued item; fetch one immediately so chart refreshes
-        resultHost.innerHTML = '<div class="mt-3 text-sm text-[var(--muted)]">Loading next…</div>';
-        useCurrent.set({ item: null, choice: null });
-        try{
-          const item = await fetchItem();
-          useCurrent.set({ item, choice: null });
-          // warm the queue for subsequent next
-          fetchNextItemEnsured();
-        }catch(e){
-          console.error('[Drill] Failed to fetch next item:', e);
-        }
+      // Hybrid next selection
+      resultHost.innerHTML = '<div class="mt-3 text-sm text-[var(--muted)]">Loading next…</div>';
+      useCurrent.set({ item: null, choice: null });
+      try{
+        const item = await getNextHybridItem();
+        useCurrent.set({ item, choice: null });
+      }catch(e){
+        console.error('[Drill] Failed to get next hybrid item:', e);
       }
     };
   };
@@ -148,8 +133,8 @@ export function Drill(root){
   wrap.appendChild(right);
   root.appendChild(wrap);
 
-  // prefetch next if queue small
-  fetchNextItemEnsured();
+  // Start hybrid session; ensures immediate local items and background batch
+  startHybridSession();
   // start response timer for telemetry (only before answering)
   if (cur.item && !cur.choice) markQuestionShown(cur.item.id);
 }

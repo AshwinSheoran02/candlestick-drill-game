@@ -1,6 +1,7 @@
 import { useSettings } from '../../lib/state/settings.js';
 import { useUI } from '../../lib/state/ui.js';
 import { strings } from '../../lib/util/strings.js';
+import { startHybridSession } from '../../lib/ai/pipeline.js';
 
 export function Home(root){
   const s = useSettings.get();
@@ -59,5 +60,5 @@ export function Home(root){
   });
   wrap.querySelector('#difficulty').onchange = (e)=> useSettings.set({ difficulty: e.target.value });
   wrap.querySelector('#settingsBtn').onclick = ()=> useUI.set({ showSettings: true });
-  wrap.querySelector('#startBtn').onclick = ()=> useUI.set({ screen: 'drill' });
+  wrap.querySelector('#startBtn').onclick = ()=> { startHybridSession(); useUI.set({ screen: 'drill' }); };
 }
