@@ -2,9 +2,7 @@
 // Uses responseMimeType application/json to encourage strict JSON output per spec.
 
 import { buildPrompt } from './prompt.js';
-const GEMINI_API_KEY1 = 'AIzaSyCRTc5G9hPlmu';
-const GEMINI_API_KEY2 = 'X6lBmT5J6Vylzi2-32o-8';
-const GEMINI_API_KEY = GEMINI_API_KEY1 + GEMINI_API_KEY2;
+const GEMINI_API_KEY = 'AIzaSyCRTc5G9hPlmuX6lBmT5J6Vylzi2-32o-8';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
