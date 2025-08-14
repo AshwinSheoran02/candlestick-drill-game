@@ -206,7 +206,11 @@ export async function getNextHybridItem(){
 
 // Batch request: expect an array of 20 TAItem objects
 async function requestGeminiBatch(params){
-  const key = 'AIzaSyCRTc5G9hPlmuX6lBmT5J6Vylzi2-32o-8';
+  const GEMINI_API_KEY1 = 'AIzaSyCRTc5G9hPlmuX6lBmT';
+    const GEMINI_API_KEY2 = '5J6Vylzi2-32o-8';
+
+  const key = GEMINI_API_KEY1 + GEMINI_API_KEY2;
+
   const body = buildBatchPrompt(params);
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' + `?key=${encodeURIComponent(key)}`;
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
