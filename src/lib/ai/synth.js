@@ -6,15 +6,14 @@ function pickR(R, arr){ return arr[Math.floor(R()*arr.length)] ; }
 
 export function localGenerate(s){
   const bars = Math.max(2, Math.min(5, s.candles|0));
-  const horizon = s.horizon===1?1:3;
   const difficulty = s.difficulty || 'Medium';
   const seed = Math.floor(Math.random()*1e9);
   const R = seeded(seed);
 
   // choose pattern by difficulty
   const easy = ['Bullish Engulfing','Bearish Engulfing','Bullish Harami','Bearish Harami','Piercing Line','Dark Cloud Cover','Marubozu Bull','Marubozu Bear','Belt Hold Bull','Belt Hold Bear'];
-  const medium = ['Morning Star','Evening Star','Doji','Harami Cross','Spinning Top','Tweezer Bottom','Tweezer Top','Dragonfly Doji','Gravestone Doji'];
-  const hard = ['Hammer','Hanging Man','Shooting Star','Inverted Hammer','Three White Soldiers','Three Black Crows','Rising Three Methods','Falling Three Methods'];
+  const medium = ['Morning Star','Evening Star','Doji','Harami Cross','Spinning Top','Tweezer Bottom','Tweezer Top','Dragonfly Doji','Gravestone Doji','Two Crows','Three Inside Up'];
+  const hard = ['Hammer','Hanging Man','Shooting Star','Inverted Hammer','Three White Soldiers','Three Black Crows','Rising Three Methods','Falling Three Methods','Concealing Baby Swallow'];
   const pool = difficulty==='Easy'? easy : difficulty==='Hard' ? [...easy,...medium,...hard] : [...easy,...medium];
   const pattern = pick(pool);
 
@@ -36,7 +35,7 @@ export function localGenerate(s){
     `Bars normalized to 0–100`
   ].slice(0, rand(2,4));
 
-  return { id: 'local-'+seed, horizon, context: { trend, vol, gap }, candles: norm, pattern_hint: pattern, label, rationale, seed };
+  return { id: 'local-'+seed, context: { trend, vol, gap }, candles: norm, pattern_hint: pattern, label, rationale, seed };
 }
 
 // Export pattern lists for external coordination
@@ -47,9 +46,8 @@ export const hardPatterns = ['Hammer','Hanging Man','Shooting Star','Inverted Ha
 // Deterministic variant generator for a specific pattern; variantIndex ensures up to 20 unique variants per pattern per session
 export function localGenerateForPattern(s, pattern, variantIndex=0){
   const bars = Math.max(2, Math.min(5, s.candles|0));
-  const horizon = s.horizon===1?1:3;
   // build a deterministic seed from pattern + variant + requested settings to keep shapes varied but reproducible
-  const seed = hashStr(`${pattern}|v=${variantIndex}|b=${bars}|h=${horizon}|d=${s.difficulty||'Medium'}`);
+  const seed = hashStr(`${pattern}|v=${variantIndex}|b=${bars}|d=${s.difficulty||'Medium'}`);
   const R = seeded(seed >>> 0);
   const trend = pickR(R, ['up','down','side']);
   const vol = pickR(R, ['low','med','high']);
@@ -65,7 +63,7 @@ export function localGenerateForPattern(s, pattern, variantIndex=0){
     `Ratios align with ${pattern}`,
     `Bars normalized to 0–100`
   ].slice(0, 2 + Math.floor(R()*2));
-  return { id: `local-${pattern}-${variantIndex}-${seed}`, horizon, context: { trend, vol, gap }, candles: norm, pattern_hint: pattern, label, rationale, seed };
+  return { id: `local-${pattern}-${variantIndex}-${seed}`, context: { trend, vol, gap }, candles: norm, pattern_hint: pattern, label, rationale, seed };
 }
 
 function hashStr(str){
@@ -120,6 +118,8 @@ function buildPattern(pattern, bars, { trend, R, gap }){
     case 'Marubozu Bear': marubozu(false); break;
     case 'Three White Soldiers': upBar(6); upBar(6); upBar(6); break;
     case 'Three Black Crows': dnBar(6); dnBar(6); dnBar(6); break;
+  case 'Two Crows': upBar(6); dnBar(5); dnBar(5); break;
+  case 'Three Inside Up': dnBar(6); { const o=level-1; const c=level+1; const h=Math.max(o,c)+2; const l=Math.min(o,c)-2; add(o,h,l,c);} upBar(7); break;
     case 'Tweezer Top': tweezerTop(); break;
     case 'Tweezer Bottom': tweezerBottom(); break;
   case 'Dragonfly Doji': dragonfly(); break;
@@ -128,11 +128,17 @@ function buildPattern(pattern, bars, { trend, R, gap }){
   case 'Belt Hold Bear': beltHold(false); break;
   case 'Rising Three Methods': upBar(8); dnBar(2); dnBar(2); dnBar(2); upBar(9); break;
   case 'Falling Three Methods': dnBar(8); upBar(2); upBar(2); upBar(2); dnBar(9); break;
+  case 'Concealing Baby Swallow': marubozu(false); marubozu(false); dnBar(4); marubozu(false); break;
     default: upBar(5); dnBar(5);
   }
 
-  // fill to bars with small noise bars
-  while(arr.length < bars){ (R()<0.5? upBar(3): dnBar(3)); }
+  // fill/trim to exactly requested bars with plausible small bars maintaining trend bias
+  while(arr.length < bars){
+    if (trend==='up') upBar(3); else if (trend==='down') dnBar(3); else (R()<0.5? upBar(3): dnBar(3));
+  }
+  if (arr.length > bars){
+    arr.length = bars;
+  }
 
   // ensure geometry h>=max(o,c) and l<=min(o,c)
   for(const k of arr){

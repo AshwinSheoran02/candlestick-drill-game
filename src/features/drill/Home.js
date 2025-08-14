@@ -16,15 +16,6 @@ export function Home(root){
           <span class="text-sm">${strings.labels.candles}: <strong id="candlesVal">${s.candles}</strong></span>
           <input id="candles" type="range" min="2" max="5" value="${s.candles}" class="w-full" />
         </label>
-        <fieldset class="grid gap-2">
-          <legend class="text-sm">${strings.labels.horizon}</legend>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="horizon" value="1" ${s.horizon===1?'checked':''} /> <span>1 bar</span>
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="radio" name="horizon" value="3" ${s.horizon===3?'checked':''} /> <span>3 bars</span>
-          </label>
-        </fieldset>
         <label class="grid gap-2">
           <span class="text-sm">${strings.labels.difficulty}</span>
           <select id="difficulty" class="bg-slate-900 border border-slate-800 rounded px-2 py-2">
@@ -41,7 +32,7 @@ export function Home(root){
     <section class="p-4 rounded-lg bg-[var(--card)] border border-slate-800">
       <h2 class="font-semibold mb-2">How it works</h2>
       <ul class="list-disc list-inside text-sm text-[var(--muted)] grid gap-1">
-        <li>Choose candles, horizon, and difficulty</li>
+  <li>Choose candles and difficulty</li>
         <li>We generate 2–5 normalized OHLC candles via Gemini or local fallback</li>
         <li>Predict Bullish/Bearish/Not sure; then review a micro-lesson</li>
         <li>Score and streak are saved locally; neutral items never break streak</li>
@@ -55,9 +46,6 @@ export function Home(root){
     wrap.querySelector('#candlesVal').textContent = e.target.value;
   };
   wrap.querySelector('#candles').onchange = (e)=> useSettings.set({ candles: parseInt(e.target.value,10) });
-  wrap.querySelectorAll('input[name="horizon"]').forEach(r=>{
-    r.onchange = ()=> useSettings.set({ horizon: parseInt(r.value,10) });
-  });
   wrap.querySelector('#difficulty').onchange = (e)=> useSettings.set({ difficulty: e.target.value });
   wrap.querySelector('#settingsBtn').onclick = ()=> useUI.set({ showSettings: true });
   wrap.querySelector('#startBtn').onclick = ()=> { startHybridSession(); useUI.set({ screen: 'drill' }); };

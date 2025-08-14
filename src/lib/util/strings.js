@@ -13,7 +13,6 @@ export const strings = {
   },
   labels: {
     candles: 'Candles',
-    horizon: 'Horizon',
     difficulty: 'Difficulty',
     score: 'Score',
     streak: 'Streak',

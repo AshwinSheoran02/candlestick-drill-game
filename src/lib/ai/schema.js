@@ -3,11 +3,10 @@ export const TAItemSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   title: 'TAItem',
   type: 'object',
-  required: ['id','horizon','candles','label','rationale'],
+  required: ['id','candles','label','rationale'],
   additionalProperties: false,
   properties: {
-    id: { type: 'string' },
-    horizon: { type: 'integer', enum: [1,3] },
+  id: { type: 'string' },
     context: {
       type: 'object', additionalProperties: false, required: ['trend','vol'],
       properties: {
@@ -23,7 +22,7 @@ export const TAItemSchema = {
         properties: { o:{type:'number'}, h:{type:'number'}, l:{type:'number'}, c:{type:'number'}, v:{type:'number'} }
       }
     },
-    pattern_hint: { type: 'string' },
+  pattern_hint: { type: 'string' },
     label: { type: 'string', enum: ['bullish','bearish','neutral'] },
     rationale: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'string' } },
     seed: { type: 'integer' }

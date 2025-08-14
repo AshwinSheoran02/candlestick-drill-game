@@ -11,7 +11,7 @@ import { readLocal, writeLocal } from '../util/storage.js';
 
 export async function fetchItem(){
   const s = useSettings.get();
-  const params = { bars: s.candles, horizon: s.horizon, difficulty: s.difficulty, avoid: getRecentPatterns().slice(0,3) };
+  const params = { bars: s.candles, difficulty: s.difficulty, avoid: getRecentPatterns().slice(0,3) };
   let err;
   for (let attempt=0; attempt<3; attempt++){
     try {
@@ -19,7 +19,7 @@ export async function fetchItem(){
       console.log('[pipeline] Gemini raw:', raw);
       const item = validateAndFix(raw, s);
       console.log('[pipeline] After validateAndFix:', item);
-      pushPattern(item.pattern_hint);
+  pushPattern(item.pattern_hint);
       return item;
     } catch(e){
       err = e;
@@ -84,10 +84,11 @@ const HYBRID = {
   usedLocalKeys: [], // persisted as array; rehydrated to Set on resume
   patternOrder: [],
   patternCursor: 0,
+  lastPattern: null,
 };
 
 function makeSessionHash(s){
-  return `d=${s.difficulty}|c=${s.candles}|h=${s.horizon}`;
+  return `d=${s.difficulty}|c=${s.candles}`;
 }
 
 export function startHybridSession(){
@@ -99,6 +100,7 @@ export function startHybridSession(){
   Object.assign(HYBRID, prev, { active: true });
   // rehydrate runtime-only
   HYBRID.usedLocalKeys = new Set(Array.isArray(prev.usedLocalKeys)? prev.usedLocalKeys : []);
+  HYBRID.lastPattern = prev.lastPattern || null;
   } else {
     HYBRID.active = true;
     HYBRID.sessionHash = hash;
@@ -110,12 +112,15 @@ export function startHybridSession(){
   HYBRID.usedLocalKeys = new Set();
   HYBRID.patternOrder = [];
   HYBRID.patternCursor = 0;
+  HYBRID.lastPattern = null;
     // Seed 5 local Easy items (2–3 candles preferred) using deterministic variants to avoid repeats
-    const seedSettings = { ...s, difficulty: 'Easy', candles: Math.min(3, Math.max(2, s.candles|0)) };
+    const seedSettings = { ...s, difficulty: 'Easy', candles: Math.max(2, Math.min(5, s.candles|0)) };
+    let lastQueued = null;
     while (HYBRID.localQueued.length < 5){
-      const item = getNextLocalItem(seedSettings, easyPatterns);
+      const item = getNextLocalItem(seedSettings, easyPatterns, lastQueued);
       if (!item) break;
       HYBRID.localQueued.push(item);
+      lastQueued = item.pattern_hint;
     }
     persistHybrid();
     // Fire a single Gemini batch in parallel
@@ -124,7 +129,7 @@ export function startHybridSession(){
   // Set current item immediately if not set
   if (!useCurrent.get().item){
   const next = HYBRID.localQueued.shift() || HYBRID.geminiQueued.shift();
-  if (next){ useCurrent.set({ item: next, choice: null }); markItemServed(next.source); }
+  if (next){ useCurrent.set({ item: next, choice: null }); markItemServed(next.source); HYBRID.lastPattern = next.pattern_hint; }
   }
 }
 
@@ -148,17 +153,21 @@ async function fireGeminiBatch(){
   HYBRID.batchFired = true;
   const s = useSettings.get();
   try{
-    const batch = await requestGeminiBatch({ bars: s.candles, horizon: s.horizon, difficulty: s.difficulty, avoid: getRecentPatterns().slice(0,3), count: 20 });
+  const batch = await requestGeminiBatch({ bars: s.candles, difficulty: s.difficulty, avoid: getRecentPatterns().slice(0,3), count: 20 });
     // validate/gate each item, drop dups, push to geminiQueued
     for(const raw of batch){
       try{
-    const fixed = annotateSource(validateAndFix(raw, s), 'gemini');
+        const fixed = annotateSource(validateAndFix(raw, s), 'gemini');
+        // Ensure exact requested candle count to honor 4/5 selection
+        if (Array.isArray(fixed.candles) && fixed.candles.length !== s.candles) {
+          continue;
+        }
         const isDup = isDuplicate(fixed);
-    if (isDup){ bumpDuplicateDropped(); continue; }
+        if (isDup){ bumpDuplicateDropped(); continue; }
         pushPattern(fixed.pattern_hint);
         HYBRID.geminiQueued.push(fixed);
       }catch(e){
-    bumpGenIssue(); bumpValidationDiscard();
+        bumpGenIssue(); bumpValidationDiscard();
       }
     }
   }catch(e){
@@ -185,13 +194,18 @@ function isDuplicate(item){
 function annotateSource(item, src){ item.source = src; return item; }
 
 export async function getNextHybridItem(){
-  // If gemini has items, prefer them; else use local; else synthesize one on the fly
-  let next = HYBRID.geminiQueued.shift();
-  if (!next) next = HYBRID.localQueued.shift();
+  // If gemini has items, prefer them; avoid immediate repeats; else use local; else synthesize
+  const last = HYBRID.lastPattern;
+  let next = null;
+  // prefer non-repeating head
+  if (HYBRID.geminiQueued.length && HYBRID.geminiQueued[0].pattern_hint !== last) next = HYBRID.geminiQueued.shift();
+  else if (HYBRID.localQueued.length && HYBRID.localQueued[0].pattern_hint !== last) next = HYBRID.localQueued.shift();
+  // fallback to any head
+  if (!next) next = HYBRID.geminiQueued.shift() || HYBRID.localQueued.shift();
   if (!next){
     const s = useSettings.get();
     // When queues empty, synthesize using deterministic pattern variants to avoid repeats within session
-    next = getNextLocalItem(s);
+    next = getNextLocalItem(s, undefined, last);
     if (!next){
       // as last resort use nondeterministic local
       const item = annotateSource(validateAndFix(localGenerate(s), s), 'local');
@@ -201,6 +215,7 @@ export async function getNextHybridItem(){
   }
   persistHybrid();
   if (next) markItemServed(next.source);
+  HYBRID.lastPattern = next?.pattern_hint || HYBRID.lastPattern;
   return next;
 }
 
@@ -220,13 +235,12 @@ async function requestGeminiBatch(params){
   return parsed;
 }
 
-function buildBatchPrompt({ bars, horizon, difficulty, avoid=[], count=20 }){
-  const prompt = `You generate STRICT JSON array (length ${count}) of TA items for candlestick drills. Each element must be an OBJECT with ONLY these keys: id, horizon, context:{trend, vol, gap}, candles:[{o,h,l,c}], pattern_hint, label, rationale (2-3 short strings), seed. Candles must be 2..5 elements based on request, 0..100 normalized. No prose.
+function buildBatchPrompt({ bars, difficulty, avoid=[], count=20 }){
+  const prompt = `You generate STRICT JSON array (length ${count}) of TA items for candlestick drills. Each element must be an OBJECT with ONLY these keys: id, context:{trend, vol, gap}, candles:[{o,h,l,c}], pattern_hint, label, rationale (2-3 short strings), seed. Candles must be 2..5 elements based on request, 0..100 normalized. No prose.
 
 Constraints:
 - Use difficulty: ${difficulty}
 - Bars per item: 2..${Math.max(2, bars)}
-- Horizon: ${horizon}
 - Target distribution: ~35% bullish / 35% bearish / 30% neutral
 - Avoid repeating any of: ${avoid.join(', ') || '—'} in pattern_hint across items
 - Geometry must satisfy OHLC rules; if pattern contradicts label, still output but label should be neutral
@@ -294,12 +308,18 @@ function rotateNextPattern(patterns){
     HYBRID.patternOrder = shuffleArray(patterns.slice());
     HYBRID.patternCursor = 0;
   }
-  const p = HYBRID.patternOrder[HYBRID.patternCursor % HYBRID.patternOrder.length];
+  const n = HYBRID.patternOrder.length;
+  let p = HYBRID.patternOrder[HYBRID.patternCursor % n];
+  // If selected equals lastPattern, advance one more to avoid immediate repeat
+  if (p === HYBRID.lastPattern && n > 1){
+    HYBRID.patternCursor = (HYBRID.patternCursor + 1) % n;
+    p = HYBRID.patternOrder[HYBRID.patternCursor % n];
+  }
   HYBRID.patternCursor = (HYBRID.patternCursor + 1) % HYBRID.patternOrder.length;
   return p;
 }
 
-function getNextLocalItem(s, restrictPatterns){
+function getNextLocalItem(s, restrictPatterns, lastPattern){
   const patterns = (restrictPatterns && restrictPatterns.length>0) ? restrictPatterns.slice() : allowedPatternsByDifficulty(s.difficulty);
   let tries = 0;
   const maxTries = patterns.length * LOCAL_VARIANTS;
@@ -307,6 +327,7 @@ function getNextLocalItem(s, restrictPatterns){
   HYBRID.usedLocalKeys = usedSet;
   while (tries++ < maxTries){
     const pattern = rotateNextPattern(patterns);
+    if (lastPattern && pattern === lastPattern && patterns.length>1) continue;
     const variant = nextVariant(pattern);
     const key = `${pattern}#${variant}`;
     if (usedSet.has(key)) continue;
@@ -315,6 +336,7 @@ function getNextLocalItem(s, restrictPatterns){
       if (isDuplicate(candidate)) { bumpDuplicateDropped(); continue; }
       pushPattern(candidate.pattern_hint);
       usedSet.add(key);
+      HYBRID.lastPattern = candidate.pattern_hint;
       return candidate;
     }catch(e){
       bumpValidationDiscard();

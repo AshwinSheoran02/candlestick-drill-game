@@ -25,10 +25,7 @@ export function validateAndFix(raw, settings){
       }
     }
   }
-  // 3) Difficulty sanity: avoid 5-bar on Easy
-  if (settings?.difficulty==='Easy' && raw.candles.length>3){
-    raw.candles = raw.candles.slice(-3);
-  }
+  // 3) No bar-count clamping; honor requested candles upstream
   // 4) Pattern sanity quick check (set ambiguous)
   const amb = detectAmbiguity(raw);
   if (amb) { raw.label = 'neutral'; raw._ambiguous = true; }
